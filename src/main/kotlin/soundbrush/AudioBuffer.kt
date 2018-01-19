@@ -5,10 +5,14 @@ import javax.sound.sampled.AudioFileFormat
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioInputStream
 import javax.sound.sampled.AudioSystem
+import kotlin.math.absoluteValue
 
-class AudioBuffer(seconds: Double, val sampleRate: Int) {
+class AudioBuffer(seconds: Double, private val sampleRate: Int) {
 
     private val buffer = DoubleArray((seconds * sampleRate).toInt())
+
+    val size: Int
+        get() = buffer.size
 
     val indices: IntRange
         get() = buffer.indices
@@ -17,17 +21,23 @@ class AudioBuffer(seconds: Double, val sampleRate: Int) {
         buffer[i] = value
     }
 
-    fun writeToWaveFile(file: File) {
-        val byteBuffer = ByteArray(buffer.size * 2)
+    fun normalize() {
+        val max = buffer.maxBy { it.absoluteValue }!!.absoluteValue
+        for (i in buffer.indices)
+            buffer[i] /= max
+    }
 
-        for (i in buffer.indices) {
-            val x = (buffer[i] * 32767.0).toInt()
-            byteBuffer[i * 2] = x.toByte()
-            byteBuffer[i * 2 + 1] = x.ushr(8).toByte()
+    fun writeToWaveFile(file: File) {
+        val bytes = ByteArray(2 * buffer.size)
+
+        buffer.forEachIndexed { i, value ->
+            val x = (value * 32767.0).toInt()
+            bytes[i * 2 + 0] = x.toByte()
+            bytes[i * 2 + 1] = (x ushr 8).toByte()
         }
 
         val format = AudioFormat(sampleRate.toFloat(), 16, 1, true, false)
-        val ais = AudioInputStream(byteBuffer.inputStream(), format, (byteBuffer.size / format.frameSize).toLong())
+        val ais = AudioInputStream(bytes.inputStream(), format, (bytes.size / format.frameSize).toLong())
 
         AudioSystem.write(ais, AudioFileFormat.Type.WAVE, file)
     }
