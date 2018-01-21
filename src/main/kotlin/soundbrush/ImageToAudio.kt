@@ -14,8 +14,16 @@ fun Raster.toSound(durationSeconds: Double = 3.0, minFreq: Int = 0, maxFreq: Int
     val maxFreqLog = log10((maxFreq - minFreq).toDouble())
     val step = maxFreqLog / height
 
-    for (i in buffer.indices) {
-        val x = (i / samplesPerPixel).coerceAtMost(width - 1)
+    val oscillators = Array(height) { y ->
+        val yy = height - y + 1
+
+        SineOscillator(
+                frequency = minFreq + 10.0.pow(step * yy),
+                sampleRate = sampleRate)
+    }
+
+    for (time in buffer.indices) {
+        val x = (time / samplesPerPixel).coerceAtMost(width - 1)
 
         var sample = 0.0
 
@@ -24,13 +32,11 @@ fun Raster.toSound(durationSeconds: Double = 3.0, minFreq: Int = 0, maxFreq: Int
 
             val sum = rgb[0] + rgb[1] + rgb[2]
             val gain = Math.pow(sum * 100 / 765.0, 2.0)
-            val yy = height - y + 1
 
-            val frequency = minFreq + 10.0.pow(step * yy)
-            sample += gain * Math.sin(frequency * Math.PI * 2 * i / sampleRate)
+            sample += gain * oscillators[y].sample(time)
         }
 
-        buffer[i] = sample
+        buffer[time] = sample
     }
 
     buffer.normalize()
